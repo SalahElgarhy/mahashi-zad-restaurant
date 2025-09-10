@@ -1,6 +1,18 @@
-# 🍽️ Mahashi Zad Restaurant - Website
+# 🍽️ Mahashi Zad Restaurant - Frontend Website
 
-A complete restaurant website for Mahashi Zad - specializing in authentic Egyptian stuffed vegetables and traditional dishes.
+A complete **Frontend-only** restaurant website for Mahashi Zad - specializing in authentic Egyptian stuffed vegetables and traditional dishes.
+
+## ⚠️ Important Note
+
+This is a **Frontend demonstration project only**. It includes:
+- ✅ User interface and design
+- ✅ Interactive components and animations
+- ✅ Form validation and user experience
+- ❌ **No actual backend integration**
+- ❌ **No real order processing**
+- ❌ **No payment processing**
+
+This project was created as a learning exercise to explore Frontend development techniques.
 
 ## 💡 Project Story
 
@@ -55,7 +67,7 @@ As a Backend Development specialist, I wanted to explore the Frontend world and 
    http://localhost:5173
    ```
 
-## 🍽️ Menu Items
+## 🍽️ Menu Items (UI Demo)
 
 - Stuffed Grape Leaves with Pomegranate Molasses
 - Grape Leaves Fattah
@@ -65,24 +77,16 @@ As a Backend Development specialist, I wanted to explore the Frontend world and 
 - Lebanese Stuffed Zucchini
 - Hospitality Platter
 
-## 💰 Payment Methods
+*These menu items are for demonstration purposes to showcase the dynamic menu interface.*
+
+## 💰 Payment Methods (UI Demo Only)
 
 - 💵 Cash on Delivery
 - 📱 Vodafone Cash
 - 💳 Instapay
 - 💳 Bank Cards (Visa, Mastercard, Meeza)
 
-## 📞 Contact Information
-
-- **WhatsApp Orders:** [01105642820](https://wa.me/201105642820)
-- **Phone Orders & Inquiries:** 0227304080
-- **Complaints & Suggestions:** 01021407307
-
-## 📍 Address
-
-Building 18, Baron School Street, Al Abageyah, El Mokattam, Cairo Governorate
-
-**Working Hours:** 2:00 PM to 9:00 PM
+*Note: These are UI demonstrations only - no actual payment processing is implemented.*
 
 ## 🎓 Learning Journey - From Backend to Frontend
 
@@ -112,21 +116,39 @@ I followed the **"Intuitive Programming"** approach:
 3. **Every field has its beauty** - Frontend has a special joy in creativity
 4. **Integration matters** - Understanding Frontend makes you a better backend developer
 
-## 📁 Project Structure
+## 📁 Frontend Project Structure
 
 ```
 src/
-├── components/          # Main components
-│   ├── MenuAccordion.jsx    # Food menu
-│   ├── CartSummary.jsx      # Shopping cart
-│   ├── ContactForm.jsx      # Order form
-│   ├── ContactInfo.jsx      # Contact information
-│   └── AboutSection.jsx     # About us section
-├── utils/               # Helper utilities
-│   └── security.js          # Security functions
-├── assets/              # Images and static files
-└── App.jsx              # Main component
+├── components/          # React Components
+│   ├── MenuAccordion.jsx    # Interactive food menu
+│   ├── CartSummary.jsx      # Shopping cart UI
+│   ├── ContactForm.jsx      # Order form (demo only)
+│   ├── ContactInfo.jsx      # Contact display
+│   └── AboutSection.jsx     # About section
+├── utils/               # Frontend utilities
+│   └── security.js          # Input sanitization
+├── assets/              # Static assets
+└── App.jsx              # Main React component
 ```
+
+## 🎯 What This Project Demonstrates
+
+### Frontend Skills:
+- ✅ React component architecture
+- ✅ State management with hooks
+- ✅ Responsive design with Tailwind CSS
+- ✅ Form validation and user input handling
+- ✅ Interactive animations and transitions
+- ✅ Arabic RTL interface design
+- ✅ Security best practices (input sanitization)
+
+### What's Missing (Backend):
+- ❌ Database integration
+- ❌ API endpoints
+- ❌ Real payment processing
+- ❌ Order management system
+- ❌ User authentication
 
 ## 🌟 Demo
 
