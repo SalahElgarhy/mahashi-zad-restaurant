@@ -1,0 +1,30 @@
+@import "tailwindcss";
+
+@layer base{
+  :root{
+    --bg:#0f1412;--surface:#171e1b;--card:#1c2420;--primary:#1faa59;--accent:#e0a23a;--text:#eef5f0;--textdim:#b9c5bd;--borderc:#2a352f
+  }
+  html{direction:rtl}
+  body{background:linear-gradient(180deg,#0e1311,#0f1412);color:var(--text);font-family:"Cairo",ui-sans-serif,system-ui,sans-serif}
+}
+
+@layer components{
+  .btn{ @apply inline-flex items-center justify-center rounded-full font-bold px-5 py-3; }
+  .btn-primary{ background:linear-gradient(90deg,var(--primary),var(--accent)); color:#0b100d; }
+  .btn-outline{ @apply border rounded-full; border-color:var(--borderc); color:var(--text); }
+  
+  @keyframes fadeInUp {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  
+  .animate-fadeInUp {
+    animation: fadeInUp 0.4s ease-out forwards;
+  }
+}
