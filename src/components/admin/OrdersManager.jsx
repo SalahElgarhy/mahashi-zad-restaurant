@@ -1,0 +1,948 @@
+﻿import { useState, useEffect } from 'react'
+import io from 'socket.io-client'
+
+// Order Card Component
+function OrderCard({ order, onUpdateStatus }) {
+  const getStatusColor = (status) => {
+    const colors = {
+      pending: { bg: '#fef3c7', border: '#f59e0b', text: '#92400e' },
+      confirmed: { bg: '#dbeafe', border: '#3b82f6', text: '#1e40af' },
+      preparing: { bg: '#fed7aa', border: '#f97316', text: '#c2410c' },
+      ready: { bg: '#e9d5ff', border: '#8b5cf6', text: '#6b21a8' },
+      delivered: { bg: '#d1fae5', border: '#10b981', text: '#047857' },
+      cancelled: { bg: '#fee2e2', border: '#ef4444', text: '#dc2626' }
+    }
+    return colors[status] || colors.pending
+  }
+
+  const getStatusText = (status) => {
+    const statusMap = {
+      pending: 'في الانتظار ⏳',
+      confirmed: 'مؤكد ✅',
+      preparing: 'قيد التحضير 👨‍🍳',
+      ready: 'جاهز ✨',
+      delivered: 'تم التوصيل 🚚',
+      cancelled: 'ملغي ❌'
+    }
+    return statusMap[status] || status
+  }
+
+  const formatDate = (dateString) => {
+    return new Date(dateString).toLocaleString('ar-EG')
+  }
+
+  const parseItems = (itemsString) => {
+    try {
+      console.log('🔍 Parsing items:', itemsString)
+      
+      if (typeof itemsString === 'string') {
+        const parsed = JSON.parse(itemsString)
+        console.log('✅ Parsed items:', parsed)
+        return Array.isArray(parsed) ? parsed : []
+      } else if (Array.isArray(itemsString)) {
+        console.log('✅ Items already array:', itemsString)
+        return itemsString
+      } else {
+        console.log('⚠️ Items is neither string nor array:', typeof itemsString, itemsString)
+        return []
+      }
+    } catch (error) {
+      console.error('❌ Error parsing items:', error, itemsString)
+      return []
+    }
+  }
+
+  const statusColor = getStatusColor(order.status)
+
+  return (
+    <div 
+      data-order-id={order.id}
+      style={{
+        backgroundColor: 'white',
+        borderRadius: '10px',
+        padding: '20px',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+        border: `2px solid ${statusColor.border}`,
+        transition: 'all 0.3s ease'
+      }}
+    >
+      {/* Header */}
+      <div style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: '15px',
+        paddingBottom: '15px',
+        borderBottom: '1px solid #e5e7eb'
+      }}>
+        <div>
+          <h3 style={{ margin: 0, fontSize: '20px', fontWeight: 'bold' }}>
+            طلب #{order.id}
+          </h3>
+          <p style={{ margin: '5px 0 0 0', color: '#6b7280', fontSize: '14px' }}>
+            {formatDate(order.created_at)}
+          </p>
+        </div>
+        <div style={{
+          backgroundColor: statusColor.bg,
+          color: statusColor.text,
+          padding: '8px 15px',
+          borderRadius: '20px',
+          border: `1px solid ${statusColor.border}`,
+          fontSize: '14px',
+          fontWeight: 'bold'
+        }}>
+          {getStatusText(order.status)}
+        </div>
+      </div>
+
+      {/* Customer Info & Order Details */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: '1fr 1fr',
+        gap: '25px',
+        marginBottom: '20px'
+      }}>
+        {/* Customer Info */}
+        <div style={{
+          backgroundColor: '#f8fafc',
+          padding: '20px',
+          borderRadius: '10px',
+          border: '1px solid #e2e8f0'
+        }}>
+          <h4 style={{ 
+            margin: '0 0 15px 0', 
+            color: '#1e293b', 
+            fontSize: '18px',
+            fontWeight: 'bold',
+            borderBottom: '2px solid #3b82f6', 
+            paddingBottom: '8px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}>
+            👤 معلومات العميل
+          </h4>
+          <div style={{ fontSize: '15px', lineHeight: '2' }}>
+            <div style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              marginBottom: '10px',
+              padding: '8px 12px',
+              backgroundColor: 'white',
+              borderRadius: '6px',
+              border: '1px solid #e2e8f0'
+            }}>
+              <span style={{ color: '#64748b', minWidth: '60px', fontWeight: 'bold' }}>الاسم:</span> 
+              <span style={{ color: '#1e293b', fontWeight: '600' }}>{order.customer_name}</span>
+            </div>
+            <div style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              marginBottom: '10px',
+              padding: '8px 12px',
+              backgroundColor: 'white',
+              borderRadius: '6px',
+              border: '1px solid #e2e8f0'
+            }}>
+              <span style={{ color: '#64748b', minWidth: '60px', fontWeight: 'bold' }}>الهاتف:</span> 
+              <span style={{ color: '#1e293b', fontWeight: '600' }}>{order.phone}</span>
+            </div>
+            <div style={{ 
+              display: 'flex', 
+              alignItems: 'flex-start', 
+              marginBottom: '10px',
+              padding: '8px 12px',
+              backgroundColor: 'white',
+              borderRadius: '6px',
+              border: '1px solid #e2e8f0'
+            }}>
+              <span style={{ color: '#64748b', minWidth: '60px', fontWeight: 'bold' }}>العنوان:</span>
+              <span style={{ color: '#1e293b', fontWeight: '600', lineHeight: '1.5' }}>{order.address}</span>
+            </div>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              marginBottom: '10px',
+              padding: '8px 12px',
+              backgroundColor: 'white',
+              borderRadius: '6px',
+              border: '1px solid #e2e8f0'
+            }}>
+              <span style={{ color: '#64748b', minWidth: '60px', fontWeight: 'bold' }}>طريقة الدفع:</span>
+              <span style={{ color: '#1e293b', fontWeight: '600' }}>{order.payment_method_text || order.payment_method || 'غير محدد'}</span>
+            </div>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              marginBottom: '10px',
+              padding: '12px',
+              backgroundColor: '#dcfce7',
+              borderRadius: '8px',
+              border: '2px solid #16a34a'
+            }}>
+              <span style={{ color: '#15803d', minWidth: '60px', fontWeight: 'bold' }}>المجموع:</span> 
+              <span style={{ 
+                color: '#15803d', 
+                fontWeight: 'bold', 
+                fontSize: '18px',
+                textShadow: '0 1px 2px rgba(0,0,0,0.1)'
+              }}>{order.total_price} ج.م</span>
+            </div>
+            {order.notes && (
+              <div style={{
+                backgroundColor: '#fef3c7',
+                padding: '12px',
+                borderRadius: '8px',
+                marginTop: '10px',
+                border: '1px solid #f59e0b'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+                  <span style={{ color: '#92400e', fontWeight: 'bold' }}>📝 ملاحظات:</span>
+                  <span style={{ color: '#92400e', lineHeight: '1.5' }}>{order.notes}</span>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Order Items */}
+        <div style={{
+          backgroundColor: '#f8fafc',
+          padding: '20px',
+          borderRadius: '10px',
+          border: '1px solid #e2e8f0'
+        }}>
+          <h4 style={{ 
+            margin: '0 0 15px 0', 
+            color: '#1e293b', 
+            fontSize: '18px',
+            fontWeight: 'bold',
+            borderBottom: '2px solid #f97316', 
+            paddingBottom: '8px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}>
+            🛒 تفاصيل الطلب
+          </h4>
+          <div style={{
+            backgroundColor: 'white',
+            padding: '15px',
+            borderRadius: '8px',
+            maxHeight: '200px',
+            overflowY: 'auto',
+            fontSize: '15px',
+            border: '1px solid #e2e8f0'
+          }}>
+            {parseItems(order.items).length > 0 ? (
+              <>
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: '15px',
+                  padding: '8px 12px',
+                  backgroundColor: '#f1f5f9',
+                  borderRadius: '6px',
+                  fontSize: '14px',
+                  fontWeight: 'bold',
+                  color: '#475569'
+                }}>
+                  <span>الصنف</span>
+                  <span>الكمية</span>
+                  <span>السعر</span>
+                  <span>المجموع</span>
+                </div>
+                {parseItems(order.items).map((item, index) => {
+                  const itemTotal = (item.unit_price || 0) * (item.quantity || 1)
+                  return (
+                    <div key={index} style={{
+                      display: 'grid',
+                      gridTemplateColumns: '2fr 1fr 1fr 1fr',
+                      gap: '10px',
+                      alignItems: 'center',
+                      marginBottom: '12px',
+                      paddingBottom: '12px',
+                      borderBottom: index < parseItems(order.items).length - 1 ? '1px solid #e2e8f0' : 'none',
+                      backgroundColor: index % 2 === 0 ? '#f8fafc' : 'white',
+                      padding: '12px',
+                      borderRadius: '6px'
+                    }}>
+                      <div style={{ 
+                        fontWeight: 'bold', 
+                        color: '#1e293b'
+                      }}>
+                        {item.name || `صنف ${index + 1}`}
+                        {item.group && (
+                          <div style={{
+                            fontSize: '12px',
+                            color: '#64748b',
+                            fontWeight: 'normal',
+                            marginTop: '2px'
+                          }}>
+                            📂 {item.group}
+                          </div>
+                        )}
+                      </div>
+                      <div style={{ 
+                        textAlign: 'center',
+                        backgroundColor: '#e2e8f0',
+                        padding: '4px 8px',
+                        borderRadius: '4px',
+                        fontSize: '14px',
+                        fontWeight: '600'
+                      }}>
+                        {item.quantity || 1}
+                      </div>
+                      <div style={{ 
+                        textAlign: 'center',
+                        color: '#059669',
+                        fontWeight: 'bold'
+                      }}>
+                        {item.unit_price || 0} ج.م
+                      </div>
+                      <div style={{ 
+                        textAlign: 'center',
+                        backgroundColor: '#dcfce7',
+                        color: '#15803d',
+                        padding: '4px 8px',
+                        borderRadius: '4px',
+                        fontSize: '14px',
+                        fontWeight: 'bold'
+                      }}>
+                        {itemTotal} ج.م
+                      </div>
+                    </div>
+                  )
+                })}
+                <div style={{
+                  borderTop: '2px solid #059669',
+                  paddingTop: '12px',
+                  marginTop: '12px',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  backgroundColor: '#dcfce7',
+                  padding: '12px',
+                  borderRadius: '8px'
+                }}>
+                  <span style={{ fontWeight: 'bold', color: '#15803d' }}>
+                    إجمالي عدد الأصناف: {parseItems(order.items).length}
+                  </span>
+                  <span style={{ fontWeight: 'bold', color: '#15803d', fontSize: '16px' }}>
+                    المجموع الكلي: {order.total_price} ج.م
+                  </span>
+                </div>
+              </>
+            ) : (
+              <div style={{
+                textAlign: 'center',
+                color: '#64748b',
+                padding: '40px 20px',
+                fontStyle: 'italic',
+                backgroundColor: '#fef2f2',
+                borderRadius: '8px',
+                border: '1px dashed #fca5a5'
+              }}>
+                ⚠️ لا توجد تفاصيل متاحة للطلب
+                <div style={{ fontSize: '12px', marginTop: '8px' }}>
+                  تحقق من بيانات الطلب في قاعدة البيانات
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Action Buttons */}
+      <div style={{
+        borderTop: '2px solid #e2e8f0',
+        paddingTop: '20px',
+        backgroundColor: '#f8fafc',
+        margin: '0 -20px -20px -20px',
+        padding: '20px',
+        borderBottomLeftRadius: '10px',
+        borderBottomRightRadius: '10px'
+      }}>
+        <div style={{
+          display: 'flex',
+          gap: '12px',
+          flexWrap: 'wrap'
+        }}>
+          {order.status === 'pending' && (
+            <>
+              <button
+                onClick={() => {
+                  if (confirm(`هل أنت متأكد من تأكيد طلب ${order.customer_name}؟\nالمجموع: ${order.total_price} ج.م`)) {
+                    onUpdateStatus(order.id, 'confirmed')
+                  }
+                }}
+                style={{
+                  flex: 1,
+                  backgroundColor: '#3b82f6',
+                  color: 'white',
+                  padding: '14px 20px',
+                  border: 'none',
+                  borderRadius: '10px',
+                  cursor: 'pointer',
+                  fontSize: '16px',
+                  fontWeight: 'bold',
+                  minWidth: '140px',
+                  boxShadow: '0 4px 6px rgba(59, 130, 246, 0.3)',
+                  transition: 'all 0.2s',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px'
+                }}
+                onMouseOver={(e) => {
+                  e.target.style.backgroundColor = '#2563eb'
+                  e.target.style.transform = 'translateY(-2px)'
+                }}
+                onMouseOut={(e) => {
+                  e.target.style.backgroundColor = '#3b82f6'
+                  e.target.style.transform = 'translateY(0)'
+                }}
+              >
+                ✅ تأكيد الطلب
+              </button>
+              <button
+                onClick={() => {
+                  if (confirm(`هل أنت متأكد من إلغاء طلب ${order.customer_name}؟\nسيتم حذف الطلب نهائياً!`)) {
+                    onUpdateStatus(order.id, 'cancelled')
+                  }
+                }}
+                style={{
+                  flex: 1,
+                  backgroundColor: '#ef4444',
+                  color: 'white',
+                  padding: '14px 20px',
+                  border: 'none',
+                  borderRadius: '10px',
+                  cursor: 'pointer',
+                  fontSize: '16px',
+                  fontWeight: 'bold',
+                  minWidth: '140px',
+                  boxShadow: '0 4px 6px rgba(239, 68, 68, 0.3)',
+                  transition: 'all 0.2s',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px'
+                }}
+                onMouseOver={(e) => {
+                  e.target.style.backgroundColor = '#dc2626'
+                  e.target.style.transform = 'translateY(-2px)'
+                }}
+                onMouseOut={(e) => {
+                  e.target.style.backgroundColor = '#ef4444'
+                  e.target.style.transform = 'translateY(0)'
+                }}
+              >
+                ❌ إلغاء الطلب
+              </button>
+            </>
+          )}
+          
+          {order.status === 'confirmed' && (
+            <button
+              onClick={() => {
+                if (confirm(`بدء تحضير طلب ${order.customer_name}؟`)) {
+                  onUpdateStatus(order.id, 'preparing')
+                }
+              }}
+              style={{
+                flex: 1,
+                backgroundColor: '#f97316',
+                color: 'white',
+                padding: '14px 20px',
+                border: 'none',
+                borderRadius: '10px',
+                cursor: 'pointer',
+                fontSize: '16px',
+                fontWeight: 'bold',
+                boxShadow: '0 4px 6px rgba(249, 115, 22, 0.3)',
+                transition: 'all 0.2s',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px'
+              }}
+              onMouseOver={(e) => {
+                e.target.style.backgroundColor = '#ea580c'
+                e.target.style.transform = 'translateY(-2px)'
+              }}
+              onMouseOut={(e) => {
+                e.target.style.backgroundColor = '#f97316'
+                e.target.style.transform = 'translateY(0)'
+              }}
+            >
+              👨‍🍳 بدء التحضير
+            </button>
+          )}
+          
+          {order.status === 'preparing' && (
+            <button
+              onClick={() => {
+                if (confirm(`الطلب جاهز للتسليم؟\nطلب ${order.customer_name}`)) {
+                  onUpdateStatus(order.id, 'ready')
+                }
+              }}
+              style={{
+                flex: 1,
+                backgroundColor: '#8b5cf6',
+                color: 'white',
+                padding: '14px 20px',
+                border: 'none',
+                borderRadius: '10px',
+                cursor: 'pointer',
+                fontSize: '16px',
+                fontWeight: 'bold',
+                boxShadow: '0 4px 6px rgba(139, 92, 246, 0.3)',
+                transition: 'all 0.2s',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px'
+              }}
+              onMouseOver={(e) => {
+                e.target.style.backgroundColor = '#7c3aed'
+                e.target.style.transform = 'translateY(-2px)'
+              }}
+              onMouseOut={(e) => {
+                e.target.style.backgroundColor = '#8b5cf6'
+                e.target.style.transform = 'translateY(0)'
+              }}
+            >
+              ✨ الطلب جاهز
+            </button>
+          )}
+          
+          {order.status === 'ready' && (
+            <button
+              onClick={() => {
+                if (confirm(`تأكيد التوصيل؟\nطلب ${order.customer_name} - ${order.total_price} ج.م`)) {
+                  onUpdateStatus(order.id, 'delivered')
+                }
+              }}
+              style={{
+                flex: 1,
+                backgroundColor: '#10b981',
+                color: 'white',
+                padding: '14px 20px',
+                border: 'none',
+                borderRadius: '10px',
+                cursor: 'pointer',
+                fontSize: '16px',
+                fontWeight: 'bold',
+                boxShadow: '0 4px 6px rgba(16, 185, 129, 0.3)',
+                transition: 'all 0.2s',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px'
+              }}
+              onMouseOver={(e) => {
+                e.target.style.backgroundColor = '#059669'
+                e.target.style.transform = 'translateY(-2px)'
+              }}
+              onMouseOut={(e) => {
+                e.target.style.backgroundColor = '#10b981'
+                e.target.style.transform = 'translateY(0)'
+              }}
+            >
+              🚚 تم التوصيل
+            </button>
+          )}
+
+          {order.status === 'delivered' && (
+            <div style={{
+              flex: 1,
+              backgroundColor: '#059669',
+              color: 'white',
+              padding: '14px 20px',
+              borderRadius: '10px',
+              fontSize: '16px',
+              fontWeight: 'bold',
+              textAlign: 'center',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px'
+            }}>
+              ✅ تم التوصيل بنجاح
+            </div>
+          )}
+
+          {order.status === 'cancelled' && (
+            <div style={{
+              flex: 1,
+              backgroundColor: '#dc2626',
+              color: 'white',
+              padding: '14px 20px',
+              borderRadius: '10px',
+              fontSize: '16px',
+              fontWeight: 'bold',
+              textAlign: 'center',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px'
+            }}>
+              ❌ تم إلغاء الطلب
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export default function OrdersManager() {
+  const [orders, setOrders] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [filter, setFilter] = useState('all')
+
+  // Fetch orders from API
+  const fetchOrders = async () => {
+    try {
+      console.log('🔄 جاري تحميل الطلبات...')
+      const response = await fetch('http://localhost:3000/api/orders')
+      const result = await response.json()
+      
+      if (result.success) {
+        setOrders(result.data || [])
+        console.log(`✅ تم تحميل ${result.data?.length || 0} طلب`)
+        
+        // Debug: طباعة أول طلب لفحص البيانات
+        if (result.data && result.data.length > 0) {
+          console.log('🔍 أول طلب في القائمة:', result.data[0])
+          console.log('🔍 تفاصيل items للطلب الأول:', result.data[0].items)
+          console.log('🔍 نوع items:', typeof result.data[0].items)
+        }
+      } else {
+        console.error('❌ فشل في تحميل الطلبات:', result.message)
+        setOrders([])
+      }
+    } catch (error) {
+      console.error('❌ خطأ في تحميل الطلبات:', error)
+      setOrders([])
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Update order status
+  const updateOrderStatus = async (orderId, newStatus) => {
+    try {
+      console.log(`🔄 تحديث حالة الطلب ${orderId} إلى ${newStatus}`)
+      
+      if (newStatus === 'cancelled') {
+        // للطلبات الملغية: حذف من قاعدة البيانات
+        const response = await fetch(`http://localhost:3000/api/orders/${orderId}`, {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' }
+        })
+        
+        const result = await response.json()
+        if (result.success) {
+          console.log('✅ تم حذف الطلب الملغي بنجاح')
+          fetchOrders() // إعادة تحميل القائمة
+          
+          // إظهار رسالة نجاح
+          const orderElement = document.querySelector(`[data-order-id="${orderId}"]`)
+          if (orderElement) {
+            orderElement.style.backgroundColor = '#fee2e2'
+            orderElement.style.border = '2px solid #ef4444'
+            setTimeout(() => {
+              fetchOrders()
+            }, 1000)
+          }
+        } else {
+          console.error('❌ فشل في حذف الطلب:', result.message)
+          alert('فشل في إلغاء الطلب: ' + result.message)
+        }
+      } else {
+        // للحالات الأخرى: تحديث الحالة فقط
+        const response = await fetch(`http://localhost:3000/api/orders/${orderId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: newStatus })
+        })
+        
+        const result = await response.json()
+        if (result.success) {
+          console.log('✅ تم تحديث الطلب بنجاح')
+          fetchOrders() // إعادة تحميل القائمة
+          
+          // تأثير بصري للتحديث
+          const orderElement = document.querySelector(`[data-order-id="${orderId}"]`)
+          if (orderElement) {
+            orderElement.style.transform = 'scale(1.02)'
+            orderElement.style.boxShadow = '0 8px 16px rgba(0,0,0,0.2)'
+            setTimeout(() => {
+              orderElement.style.transform = 'scale(1)'
+              orderElement.style.boxShadow = '0 2px 8px rgba(0,0,0,0.1)'
+            }, 300)
+          }
+        } else {
+          console.error('❌ فشل في تحديث الطلب:', result.message)
+          alert('فشل في تحديث حالة الطلب: ' + result.message)
+        }
+      }
+    } catch (error) {
+      console.error('❌ خطأ في تحديث الطلب:', error)
+      alert('حدث خطأ في تحديث الطلب')
+    }
+  }
+
+  // Load orders on component mount and setup real-time updates
+  useEffect(() => {
+    fetchOrders()
+    
+    // Setup Socket.IO for real-time updates
+    const socket = io('http://localhost:3000')
+    
+    socket.on('newOrder', (orderData) => {
+      console.log('🔔 طلب جديد وصل:', orderData)
+      fetchOrders() // إعادة تحميل الطلبات
+    })
+
+    socket.on('orderUpdated', (updatedOrder) => {
+      console.log('📝 تم تحديث طلب:', updatedOrder)
+      fetchOrders() // إعادة تحميل الطلبات
+    })
+
+    // Auto-refresh every 10 seconds
+    const interval = setInterval(fetchOrders, 10000)
+
+    return () => {
+      socket.disconnect()
+      clearInterval(interval)
+    }
+  }, [])
+
+  // Filter orders - exclude cancelled from "all"
+  const filteredOrders = filter === 'all' 
+    ? orders.filter(order => order.status !== 'cancelled') // استبعاد الملغية من جميع الطلبات
+    : orders.filter(order => order.status === filter)
+
+  // Get status counts
+  const getStatusCount = (status) => {
+    if (status === 'all') return orders.filter(order => order.status !== 'cancelled').length // عدد الطلبات النشطة فقط
+    return orders.filter(order => order.status === status).length
+  }
+
+  if (loading) {
+    return (
+      <div style={{ 
+        padding: '20px', 
+        backgroundColor: '#f3f4f6', 
+        minHeight: '100vh',
+        direction: 'rtl',
+        fontFamily: 'Arial, sans-serif',
+        textAlign: 'center'
+      }}>
+        <div style={{ fontSize: '48px', marginBottom: '20px' }}>⏳</div>
+        <h2>جاري تحميل الطلبات...</h2>
+      </div>
+    )
+  }
+  return (
+    <div style={{ 
+      padding: '20px', 
+      backgroundColor: '#f3f4f6', 
+      minHeight: '100vh',
+      direction: 'rtl',
+      fontFamily: 'Arial, sans-serif'
+    }}>
+      {/* Header */}
+      <div style={{
+        backgroundColor: '#059669',
+        color: 'white',
+        padding: '15px',
+        borderRadius: '10px',
+        marginBottom: '20px',
+        textAlign: 'center'
+      }}>
+        <h1 style={{ margin: 0, fontSize: '24px' }}>
+          ✅ إدارة الطلبات - العدد الإجمالي: {orders.length}
+        </h1>
+        <button 
+          onClick={fetchOrders}
+          style={{
+            backgroundColor: 'rgba(255,255,255,0.2)',
+            color: 'white',
+            border: '1px solid rgba(255,255,255,0.3)',
+            padding: '8px 16px',
+            borderRadius: '6px',
+            cursor: 'pointer',
+            marginTop: '10px',
+            fontSize: '14px'
+          }}
+        >
+          🔄 تحديث الطلبات
+        </button>
+      </div>
+
+      {/* Filter Buttons */}
+      <div style={{
+        backgroundColor: 'white',
+        padding: '20px',
+        borderRadius: '10px',
+        marginBottom: '20px',
+        boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+      }}>
+        <h2 style={{ margin: '0 0 15px 0', color: '#374151' }}>فلاتر الطلبات:</h2>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
+          <button 
+            onClick={() => setFilter('all')}
+            style={{
+              backgroundColor: filter === 'all' ? '#374151' : '#9ca3af',
+              color: 'white',
+              padding: '10px 15px',
+              border: 'none',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              fontSize: '14px'
+            }}
+          >
+            ⚫ الطلبات النشطة ({getStatusCount('all')})
+          </button>
+          <button 
+            onClick={() => setFilter('pending')}
+            style={{
+              backgroundColor: filter === 'pending' ? '#eab308' : '#fbbf24',
+              color: 'white',
+              padding: '10px 15px',
+              border: 'none',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              fontSize: '14px'
+            }}
+          >
+            🟡 في الانتظار ({getStatusCount('pending')})
+          </button>
+          <button 
+            onClick={() => setFilter('confirmed')}
+            style={{
+              backgroundColor: filter === 'confirmed' ? '#3b82f6' : '#60a5fa',
+              color: 'white',
+              padding: '10px 15px',
+              border: 'none',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              fontSize: '14px'
+            }}
+          >
+            🔵 مؤكد ({getStatusCount('confirmed')})
+          </button>
+          <button 
+            onClick={() => setFilter('preparing')}
+            style={{
+              backgroundColor: filter === 'preparing' ? '#f97316' : '#fb923c',
+              color: 'white',
+              padding: '10px 15px',
+              border: 'none',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              fontSize: '14px'
+            }}
+          >
+            🟠 قيد التحضير ({getStatusCount('preparing')})
+          </button>
+          <button 
+            onClick={() => setFilter('ready')}
+            style={{
+              backgroundColor: filter === 'ready' ? '#8b5cf6' : '#a78bfa',
+              color: 'white',
+              padding: '10px 15px',
+              border: 'none',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              fontSize: '14px'
+            }}
+          >
+            🟣 جاهز ({getStatusCount('ready')})
+          </button>
+          <button 
+            onClick={() => setFilter('delivered')}
+            style={{
+              backgroundColor: filter === 'delivered' ? '#10b981' : '#34d399',
+              color: 'white',
+              padding: '10px 15px',
+              border: 'none',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              fontSize: '14px'
+            }}
+          >
+            🟢 تم التوصيل ({getStatusCount('delivered')})
+          </button>
+          <button 
+            onClick={() => setFilter('cancelled')}
+            style={{
+              backgroundColor: filter === 'cancelled' ? '#ef4444' : '#f87171',
+              color: 'white',
+              padding: '10px 15px',
+              border: 'none',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              fontSize: '14px'
+            }}
+          >
+            🔴 الطلبات الملغية ({getStatusCount('cancelled')})
+          </button>
+        </div>
+      </div>
+
+      {/* Orders List */}
+      {filteredOrders.length === 0 ? (
+        <div style={{
+          backgroundColor: 'white',
+          padding: '40px',
+          borderRadius: '10px',
+          textAlign: 'center',
+          boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+        }}>
+          <div style={{ fontSize: '64px', marginBottom: '20px' }}>📭</div>
+          <h2 style={{ color: '#374151', marginBottom: '10px' }}>
+            {filter === 'all' ? 'لا توجد طلبات حتى الآن' : `لا توجد طلبات ${getFilterName(filter)}`}
+          </h2>
+          <p style={{ color: '#6b7280', marginBottom: '20px' }}>سيتم عرض الطلبات هنا عند وصولها</p>
+          
+          <div style={{
+            backgroundColor: '#dbeafe',
+            padding: '15px',
+            borderRadius: '8px',
+            border: '1px solid #93c5fd'
+          }}>
+            <p style={{ color: '#1d4ed8', margin: 0, fontSize: '14px' }}>
+              💡 لإختبار النظام: اذهب للموقع الرئيسي واطلب شيئاً، ثم ارجع هنا لإدارة الطلب
+            </p>
+          </div>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+          {filteredOrders.map((order) => (
+            <OrderCard key={order.id} order={order} onUpdateStatus={updateOrderStatus} />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+
+  // Helper function to get filter name in Arabic
+  function getFilterName(filter) {
+    const names = {
+      pending: 'في الانتظار',
+      confirmed: 'مؤكدة',
+      preparing: 'قيد التحضير',
+      ready: 'جاهزة',
+      delivered: 'مُسلمة',
+      cancelled: 'ملغية'
+    }
+    return names[filter] || filter
+  }
+}

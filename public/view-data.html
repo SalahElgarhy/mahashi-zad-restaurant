@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>عرض البيانات المحفوظة - محاشي زاد</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .header h1 {
+            color: #2d5a87;
+            margin: 0;
+            font-size: 2.5em;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+        }
+        .status {
+            background: #e8f5e8;
+            color: #2e7d32;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+            text-align: center;
+            font-weight: bold;
+            border: 2px solid #4caf50;
+        }
+        .buttons {
+            text-align: center;
+            margin: 30px 0;
+        }
+        .btn {
+            display: inline-block;
+            padding: 12px 25px;
+            margin: 5px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            text-decoration: none;
+            transition: all 0.3s ease;
+        }
+        .btn-primary {
+            background: #2d5a87;
+            color: white;
+        }
+        .btn-primary:hover {
+            background: #1e3a5f;
+            transform: translateY(-2px);
+        }
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+        }
+        .btn-danger:hover {
+            background: #c82333;
+            transform: translateY(-2px);
+        }
+        .section {
+            margin: 30px 0;
+            padding: 25px;
+            border: 2px solid #e0e0e0;
+            border-radius: 12px;
+            background: #fafafa;
+        }
+        .section h2 {
+            color: #d4a574;
+            border-bottom: 3px solid #d4a574;
+            padding-bottom: 10px;
+            margin-top: 0;
+            font-size: 1.5em;
+        }
+        .data-display {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 15px 0;
+            font-family: 'Courier New', monospace;
+            direction: ltr;
+            text-align: left;
+            border: 1px solid #dee2e6;
+            max-height: 400px;
+            overflow-y: auto;
+            font-size: 14px;
+            line-height: 1.4;
+        }
+        .empty {
+            color: #6c757d;
+            font-style: italic;
+            text-align: center;
+            padding: 40px;
+            background: #fff3cd;
+            border: 2px dashed #ffc107;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .stat-item {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #dee2e6;
+            text-align: center;
+        }
+        .stat-value {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #2d5a87;
+        }
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #6c757d;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🍽️ البيانات المحفوظة - محاشي زاد</h1>
+            <div class="status" id="status">
+                ✅ الصفحة محملة بنجاح - جاري تحميل البيانات...
+            </div>
+        </div>
+        
+        <div class="buttons">
+            <button class="btn btn-primary" onclick="loadData()">🔄 تحديث البيانات</button>
+            <button class="btn btn-danger" onclick="clearAllData()">🗑️ مسح جميع البيانات</button>
+            <a href="admin.html" class="btn btn-primary" target="_blank">⚙️ فتح لوحة الإدارة</a>
+        </div>
+
+        <div class="section">
+            <h2>📋 بيانات القائمة</h2>
+            <div id="menu-data" class="data-display loading">جاري تحميل بيانات القائمة...</div>
+        </div>
+
+        <div class="section">
+            <h2>🎁 بيانات العروض</h2>
+            <div id="offers-data" class="data-display loading">جاري تحميل بيانات العروض...</div>
+        </div>
+
+        <div class="section">
+            <h2>📊 إحصائيات البيانات</h2>
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <div class="stat-value" id="last-update">--</div>
+                    <div>آخر تحديث</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value" id="menu-size">0 KB</div>
+                    <div>حجم بيانات القائمة</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value" id="offers-size">0 KB</div>
+                    <div>حجم بيانات العروض</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value" id="total-items">0</div>
+                    <div>إجمالي العناصر</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        console.log('🚀 JavaScript محمل بنجاح');
+        
+        function updateStatus(message, isError = false) {
+            const status = document.getElementById('status');
+            status.textContent = message;
+            status.style.background = isError ? '#ffebee' : '#e8f5e8';
+            status.style.color = isError ? '#c62828' : '#2e7d32';
+            status.style.borderColor = isError ? '#f44336' : '#4caf50';
+        }
+
+        function loadData() {
+            console.log('📊 جاري تحميل البيانات...');
+            updateStatus('⏳ جاري تحميل البيانات...');
+            
+            let totalItems = 0;
+            
+            try {
+                // تحميل بيانات القائمة
+                const menuData = localStorage.getItem('mahashi-menu-data');
+                const menuDisplay = document.getElementById('menu-data');
+                
+                if (menuData) {
+                    try {
+                        const parsed = JSON.parse(menuData);
+                        menuDisplay.innerHTML = '<pre>' + JSON.stringify(parsed, null, 2) + '</pre>';
+                        menuDisplay.className = 'data-display';
+                        document.getElementById('menu-size').textContent = (menuData.length / 1024).toFixed(2) + ' KB';
+                        
+                        // حساب عدد العناصر
+                        if (Array.isArray(parsed)) {
+                            parsed.forEach(group => {
+                                if (group.items && Array.isArray(group.items)) {
+                                    totalItems += group.items.length;
+                                }
+                            });
+                        }
+                        
+                        console.log('✅ تم تحميل بيانات القائمة');
+                    } catch (e) {
+                        menuDisplay.textContent = 'خطأ في تحليل بيانات القائمة: ' + e.message;
+                        menuDisplay.className = 'data-display';
+                        console.error('❌ خطأ في تحليل بيانات القائمة:', e);
+                    }
+                } else {
+                    menuDisplay.textContent = 'لا توجد بيانات قائمة محفوظة';
+                    menuDisplay.className = 'data-display empty';
+                    document.getElementById('menu-size').textContent = '0 KB';
+                    console.log('⚠️ لا توجد بيانات قائمة محفوظة');
+                }
+
+                // تحميل بيانات العروض
+                const offersData = localStorage.getItem('mahashi-offers-data');
+                const offersDisplay = document.getElementById('offers-data');
+                
+                if (offersData) {
+                    try {
+                        const parsed = JSON.parse(offersData);
+                        offersDisplay.innerHTML = '<pre>' + JSON.stringify(parsed, null, 2) + '</pre>';
+                        offersDisplay.className = 'data-display';
+                        document.getElementById('offers-size').textContent = (offersData.length / 1024).toFixed(2) + ' KB';
+                        
+                        if (Array.isArray(parsed)) {
+                            totalItems += parsed.length;
+                        }
+                        
+                        console.log('✅ تم تحميل بيانات العروض');
+                    } catch (e) {
+                        offersDisplay.textContent = 'خطأ في تحليل بيانات العروض: ' + e.message;
+                        offersDisplay.className = 'data-display';
+                        console.error('❌ خطأ في تحليل بيانات العروض:', e);
+                    }
+                } else {
+                    offersDisplay.textContent = 'لا توجد بيانات عروض محفوظة';
+                    offersDisplay.className = 'data-display empty';
+                    document.getElementById('offers-size').textContent = '0 KB';
+                    console.log('⚠️ لا توجد بيانات عروض محفوظة');
+                }
+
+                // تحديث الإحصائيات
+                document.getElementById('total-items').textContent = totalItems;
+                document.getElementById('last-update').textContent = new Date().toLocaleString('ar-EG');
+                
+                updateStatus('✅ تم تحميل جميع البيانات بنجاح');
+                console.log('✅ تم تحميل جميع البيانات بنجاح');
+                
+            } catch (error) {
+                console.error('❌ خطأ عام في تحميل البيانات:', error);
+                updateStatus('❌ حدث خطأ في تحميل البيانات: ' + error.message, true);
+            }
+        }
+
+        function clearAllData() {
+            if (confirm('هل أنت متأكد من حذف جميع البيانات المحفوظة؟')) {
+                try {
+                    localStorage.removeItem('mahashi-menu-data');
+                    localStorage.removeItem('mahashi-offers-data');
+                    alert('✅ تم حذف جميع البيانات بنجاح');
+                    updateStatus('✅ تم حذف جميع البيانات بنجاح');
+                    loadData();
+                    console.log('✅ تم حذف جميع البيانات');
+                } catch (error) {
+                    console.error('❌ خطأ في حذف البيانات:', error);
+                    updateStatus('❌ خطأ في حذف البيانات', true);
+                }
+            }
+        }
+
+        // تحميل البيانات عند فتح الصفحة
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('📄 تم تحميل الصفحة');
+            setTimeout(loadData, 500);
+        });
+
+        // تحديث تلقائي كل 10 ثواني
+        setInterval(function() {
+            console.log('🔄 تحديث تلقائي...');
+            loadData();
+        }, 10000);
+        
+        console.log('✅ تم تحميل جميع الأكواد بنجاح');
+    </script>
+</body>
+</html>

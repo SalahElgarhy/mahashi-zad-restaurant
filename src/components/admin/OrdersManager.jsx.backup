@@ -1,0 +1,611 @@
+import { useState, useEffect } from 'react'
+import { Button, Card, Input } from '../ui'
+
+export default function OrdersManager() {
+  const [orders, setOrders] = useState([])
+  const [filter, setFilter] = useState('pending') // pending, confirmed, preparing, ready, delivered, cancelled
+  const [loading, setLoading] = useState(false)
+
+  // جلب الطلبات من localStorage
+  const fetchOrders = () => {
+    setLoading(true)
+    try {
+      const savedOrders = localStorage.getItem('mahashi-orders-data')
+      if (savedOrders) {
+        const parsedOrders = JSON.parse(savedOrders)
+        setOrders(parsedOrders)
+      } else {
+        // لا توجد طلبات حتى الآن
+        setOrders([])
+      }
+    } catch (error) {
+      console.error('خطأ في جلب الطلبات:', error)
+      setOrders([])
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchOrders()
+  }, [])
+
+  // تنظيف تلقائي بسيط عند تحميل الطلبات  
+  useEffect(() => {
+    const cleanupOldOrders = () => {
+      if (orders.length > 0) {
+        const now = new Date()
+        const HOURS_48 = 48 * 60 * 60 * 1000
+        
+        const cleanedOrders = orders.filter(order => {
+          if (order.status === 'delivered' || order.status === 'cancelled') {
+            const updatedTime = new Date(order.updated_at || order.created_at)
+            const timeDiff = now - updatedTime
+            return timeDiff < HOURS_48
+          }
+          return true
+        })
+
+        if (cleanedOrders.length < orders.length) {
+          setOrders(cleanedOrders)
+          localStorage.setItem('mahashi-orders-data', JSON.stringify(cleanedOrders))
+        }
+      }
+    }
+
+    // تنظيف فوري عند التحميل
+    cleanupOldOrders()
+
+    // تنظيف دوري كل 30 دقيقة
+    const interval = setInterval(cleanupOldOrders, 30 * 60 * 1000)
+    
+    return () => clearInterval(interval)
+  }, [orders])
+
+  // تحديث حالة الطلب وحفظ في localStorage
+  const updateOrderStatus = (orderId, newStatus) => {
+    const updatedOrders = orders.map(order => 
+      order.id === orderId 
+        ? { ...order, status: newStatus, updated_at: new Date().toISOString() }
+        : order
+    )
+    setOrders(updatedOrders)
+    
+    // حفظ في localStorage
+    localStorage.setItem('mahashi-orders-data', JSON.stringify(updatedOrders))
+    
+    // إشعار صوتي
+    const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhCSqJzOzdjjUHGGS57+OZSBETXLD3w2ojBjiS1+7NezAGJHTH7t2OPggXY7fp5qNbEAhMoe7qumgiCjGH0fTbjTcHGWq35+GaRhAOS6zzzm0jBipex+LMTSUDKGe+6OaUS2ooBjqC1fHOdC0EJV/tRWgvCD2M0/X6ijYHGWi66tpPEQdGm+HymGMmBTF+09Hsqr/3w+hPGBdgpt/u5V2+BT2J8eVajx6K38WR8MlCKhEQDUhZZ8mJgH0lAwBbRVOlAKBgYKVBTUplOVF4VFJaUWpFXzJNLUoWSGBfwwQGVwIBFSwYAA+JzTfPJVTFc3oPWAAm');
+    audio.play().catch(() => {}); // تجاهل الأخطاء الصوتية
+  }
+
+  // تنظيف الطلبات القديمة تلقائياً (بعد 48 ساعة من التوصيل أو الإلغاء)
+  const cleanOldOrders = () => {
+    const now = new Date()
+    const HOURS_48 = 48 * 60 * 60 * 1000 // 48 ساعة بالميللي ثانية
+    
+    const cleanedOrders = orders.filter(order => {
+      // إذا كان الطلب متم التوصيل أو ملغي
+      if (order.status === 'delivered' || order.status === 'cancelled') {
+        const updatedTime = new Date(order.updated_at || order.created_at)
+        const timeDiff = now - updatedTime
+        
+        // إذا مر أكثر من 48 ساعة، احذف الطلب
+        return timeDiff < HOURS_48
+      }
+      
+      // احتفظ بالطلبات الأخرى
+      return true
+    })
+
+    // إذا تم حذف طلبات
+    if (cleanedOrders.length < orders.length) {
+      const deletedCount = orders.length - cleanedOrders.length
+      setOrders(cleanedOrders)
+      localStorage.setItem('mahashi-orders-data', JSON.stringify(cleanedOrders))
+      
+      // إشعار للأدمن
+      alert(`🗑️ تم تنظيف ${deletedCount} طلب قديم تلقائياً (أكثر من 48 ساعة)`)
+      
+      return deletedCount
+    }
+    
+    return 0
+  }
+
+  // تنظيف يدوي فوري للطلبات القديمة
+  const manualCleanOldOrders = () => {
+    const deletedCount = cleanOldOrders()
+    if (deletedCount === 0) {
+      alert('✅ لا توجد طلبات قديمة للحذف')
+    }
+  }
+
+  // فحص الطلبات التي ستتم أرشفتها قريباً (خلال 6 ساعات)
+  const getOrdersToBeArchived = () => {
+    const now = new Date()
+    const HOURS_42 = 42 * 60 * 60 * 1000 // 42 ساعة (قبل الحذف بـ 6 ساعات)
+    const HOURS_48 = 48 * 60 * 60 * 1000 // 48 ساعة
+    
+    return orders.filter(order => {
+      if (order.status === 'delivered' || order.status === 'cancelled') {
+        const updatedTime = new Date(order.updated_at || order.created_at)
+        const timeDiff = now - updatedTime
+        
+        // الطلبات التي مر عليها أكثر من 42 ساعة وأقل من 48
+        return timeDiff >= HOURS_42 && timeDiff < HOURS_48
+      }
+      return false
+    })
+  }
+
+  // فلترة الطلبات
+  const filteredOrders = orders.filter(order => order.status === filter)
+
+  // إحصائيات الطلبات
+  const getOrderStats = () => {
+    return {
+      pending: orders.filter(o => o.status === 'pending').length,
+      confirmed: orders.filter(o => o.status === 'confirmed').length,
+      preparing: orders.filter(o => o.status === 'preparing').length,
+      ready: orders.filter(o => o.status === 'ready').length,
+      delivered: orders.filter(o => o.status === 'delivered').length,
+      cancelled: orders.filter(o => o.status === 'cancelled').length,
+    }
+  }
+
+  // تنسيق الوقت
+  const formatTime = (dateString) => {
+    return new Date(dateString).toLocaleString('ar-EG', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    })
+  }
+
+  // ألوان وأيقونات حالات الطلبات
+  const getStatusConfig = (status) => {
+    switch (status) {
+      case 'pending': 
+        return { 
+          color: 'bg-yellow-100 text-yellow-800 border-yellow-300', 
+          icon: '⏳', 
+          text: 'في الانتظار',
+          bgColor: 'bg-yellow-50'
+        }
+      case 'confirmed': 
+        return { 
+          color: 'bg-blue-100 text-blue-800 border-blue-300', 
+          icon: '✅', 
+          text: 'مؤكد',
+          bgColor: 'bg-blue-50'
+        }
+      case 'preparing': 
+        return { 
+          color: 'bg-orange-100 text-orange-800 border-orange-300', 
+          icon: '🍳', 
+          text: 'قيد التحضير',
+          bgColor: 'bg-orange-50'
+        }
+      case 'ready': 
+        return { 
+          color: 'bg-green-100 text-green-800 border-green-300', 
+          icon: '🎯', 
+          text: 'جاهز للتوصيل',
+          bgColor: 'bg-green-50'
+        }
+      case 'delivered': 
+        return { 
+          color: 'bg-gray-100 text-gray-800 border-gray-300', 
+          icon: '🚚', 
+          text: 'تم التوصيل',
+          bgColor: 'bg-gray-50'
+        }
+      case 'cancelled': 
+        return { 
+          color: 'bg-red-100 text-red-800 border-red-300', 
+          icon: '❌', 
+          text: 'ملغي',
+          bgColor: 'bg-red-50'
+        }
+      default: 
+        return { 
+          color: 'bg-gray-100 text-gray-800 border-gray-300', 
+          icon: '❓', 
+          text: 'غير محدد',
+          bgColor: 'bg-gray-50'
+        }
+    }
+  }
+
+  const stats = getOrderStats()
+
+  return (
+    <div className="space-y-6">
+      {/* Header with stats and controls */}
+      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-6 border border-blue-200">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-3xl font-bold text-gray-800">📋 إدارة الطلبات</h2>
+          
+          {/* أزرار التحكم */}
+          <div className="flex gap-3">
+            <Button 
+              onClick={manualCleanOldOrders}
+              variant="outline" 
+              className="bg-red-100 hover:bg-red-200 text-red-700 border-red-300 font-bold px-4 py-2 rounded-lg transition-all duration-200"
+            >
+              �️ تنظيف الطلبات القديمة
+            </Button>
+            
+            <Button 
+              onClick={fetchOrders}
+              variant="primary" 
+              className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-4 py-2 rounded-lg transition-all duration-200"
+            >
+              🔄 تحديث
+            </Button>
+          </div>
+        </div>
+
+        {/* إشعار الطلبات التي ستتم أرشفتها قريباً */}
+        {getOrdersToBeArchived().length > 0 && (
+          <div className="mb-4 p-4 bg-orange-100 border border-orange-300 rounded-lg">
+            <div className="flex items-center gap-2 text-orange-800">
+              <span className="text-xl">⚠️</span>
+              <span className="font-bold">
+                {getOrdersToBeArchived().length} طلب سيتم حذفهم تلقائياً خلال 6 ساعات
+              </span>
+            </div>
+            <div className="text-sm text-orange-600 mt-1">
+              الطلبات المتم توصيلها أو الملغاة منذ أكثر من 42 ساعة
+            </div>
+          </div>
+        )}
+        
+        {/* إحصائيات سريعة */}
+        <div className="grid grid-cols-2 md:grid-cols-6 gap-4 mb-6">
+          <div className="bg-yellow-100 p-3 rounded-lg text-center">
+            <div className="text-2xl">⏳</div>
+            <div className="font-bold text-yellow-800">{stats.pending}</div>
+            <div className="text-xs text-yellow-600">في الانتظار</div>
+          </div>
+          <div className="bg-blue-100 p-3 rounded-lg text-center">
+            <div className="text-2xl">✅</div>
+            <div className="font-bold text-blue-800">{stats.confirmed}</div>
+            <div className="text-xs text-blue-600">مؤكد</div>
+          </div>
+          <div className="bg-orange-100 p-3 rounded-lg text-center">
+            <div className="text-2xl">🍳</div>
+            <div className="font-bold text-orange-800">{stats.preparing}</div>
+            <div className="text-xs text-orange-600">قيد التحضير</div>
+          </div>
+          <div className="bg-green-100 p-3 rounded-lg text-center">
+            <div className="text-2xl">🎯</div>
+            <div className="font-bold text-green-800">{stats.ready}</div>
+            <div className="text-xs text-green-600">جاهز</div>
+          </div>
+          <div className="bg-gray-100 p-3 rounded-lg text-center">
+            <div className="text-2xl">🚚</div>
+            <div className="font-bold text-gray-800">{stats.delivered}</div>
+            <div className="text-xs text-gray-600">تم التوصيل</div>
+          </div>
+          <div className="bg-red-100 p-3 rounded-lg text-center">
+            <div className="text-2xl">❌</div>
+            <div className="font-bold text-red-800">{stats.cancelled}</div>
+            <div className="text-xs text-red-600">ملغي</div>
+          </div>
+        </div>
+
+        {/* معلومات التنظيف التلقائي */}
+        <div className="mt-4 p-3 bg-gray-50 rounded-lg border border-gray-200">
+          <div className="flex items-center justify-between text-sm text-gray-600">
+            <div className="flex items-center gap-2">
+              <span className="text-lg">🤖</span>
+              <span>التنظيف التلقائي: يتم حذف الطلبات المتم توصيلها/الملغاة بعد 48 ساعة</span>
+            </div>
+            <div className="flex items-center gap-4">
+              <span>📊 إجمالي الطلبات: {orders.length}</span>
+              {getOrdersToBeArchived().length > 0 && (
+                <span className="text-orange-600 font-medium">
+                  ⏱️ سيتم أرشفة {getOrdersToBeArchived().length} قريباً
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* فلاتر الحالات */}
+        <div className="flex gap-3 flex-wrap mt-4">
+          {[
+            { key: 'pending', icon: '⏳', text: 'في الانتظار', count: stats.pending },
+            { key: 'confirmed', icon: '✅', text: 'مؤكد', count: stats.confirmed },
+            { key: 'preparing', icon: '🍳', text: 'قيد التحضير', count: stats.preparing },
+            { key: 'ready', icon: '🎯', text: 'جاهز', count: stats.ready },
+            { key: 'delivered', icon: '🚚', text: 'تم التوصيل', count: stats.delivered },
+            { key: 'cancelled', icon: '❌', text: 'ملغي', count: stats.cancelled }
+          ].map(status => (
+            <Button
+              key={status.key}
+              variant={filter === status.key ? 'primary' : 'outline'}
+              size="small"
+              onClick={() => setFilter(status.key)}
+              className="flex items-center gap-2"
+            >
+              <span className="text-lg">{status.icon}</span>
+              <span>{status.text}</span>
+              <span className="bg-white/20 px-2 py-1 rounded-full text-xs">{status.count}</span>
+            </Button>
+          ))}
+          <Button
+            variant="outline"
+            size="small"
+            onClick={fetchOrders}
+            className="text-blue-600 hover:bg-blue-50"
+          >
+            🔄 تحديث
+          </Button>
+        </div>
+      </div>
+
+      {/* Loading state */}
+      {loading && (
+        <Card>
+          <Card.Content>
+            <div className="text-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+              <p>جاري تحميل الطلبات...</p>
+            </div>
+          </Card.Content>
+        </Card>
+      )}
+
+      {/* Orders List */}
+      {!loading && (
+        <div className="space-y-4">
+          {filteredOrders.length === 0 ? (
+            <Card className="border-2 border-dashed border-gray-300">
+              <Card.Content>
+                <div className="text-center py-16">
+                  <div className="text-8xl mb-6">�</div>
+                  <h3 className="text-3xl font-bold text-gray-600 mb-4">
+                    {orders.length === 0 
+                      ? 'لا توجد طلبات حتى الآن' 
+                      : 'لا توجد طلبات في هذا التصفية'
+                    }
+                  </h3>
+                  <p className="text-xl text-gray-500 mb-6">
+                    {orders.length === 0 
+                      ? 'بمجرد أن يقوم العملاء بعمل طلبات من الموقع، ستظهر هنا فوراً' 
+                      : 'جرب تصفح حالات أخرى أو انتظر طلبات جديدة'
+                    }
+                  </p>
+                  {orders.length === 0 && (
+                    <div className="bg-blue-50 p-6 rounded-xl border border-blue-200 max-w-md mx-auto">
+                      <div className="text-2xl mb-3">💡</div>
+                      <p className="text-blue-700 font-medium">
+                        الطلبات الحقيقية ستظهر تلقائياً هنا عندما يطلب العملاء من صفحة القائمة
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </Card.Content>
+            </Card>
+          ) : (
+            filteredOrders.map((order) => {
+              const statusConfig = getStatusConfig(order.status)
+              return (
+                <Card key={order.id} className={`border-l-8 ${statusConfig.bgColor} hover:shadow-xl transition-all duration-300 mb-6`}>
+                  <Card.Header className="bg-gradient-to-r from-white to-gray-50 p-6">
+                    <div className="flex justify-between items-start">
+                      <div className="flex items-center gap-4">
+                        <div className="text-5xl animate-pulse">{statusConfig.icon}</div>
+                        <div>
+                          <h3 className="text-2xl font-black text-gray-800 mb-2">
+                            🧾 طلب رقم #{order.orderNumber || order.id}
+                          </h3>
+                          <div className="flex items-center gap-3 text-lg text-gray-600">
+                            <span className="bg-blue-100 px-3 py-1 rounded-full flex items-center gap-2">
+                              <span>🕒</span>
+                              {formatTime(order.created_at)}
+                            </span>
+                            {order.estimated_time && (
+                              <span className="bg-orange-100 text-orange-800 px-3 py-1 rounded-full font-bold flex items-center gap-2">
+                                <span>⏰</span>
+                                {order.estimated_time}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="text-center">
+                        <span className={`px-6 py-3 rounded-xl text-lg font-black border-3 ${statusConfig.color} flex items-center gap-3 shadow-lg`}>
+                          <span className="text-2xl">{statusConfig.icon}</span>
+                          <span>{statusConfig.text}</span>
+                        </span>
+                        <div className="mt-2 text-2xl font-black text-green-600">
+                          💰 {order.total_amount} ج
+                        </div>
+                      </div>
+                    </div>
+                  </Card.Header>
+                
+                <Card.Content className="p-6">
+                  <div className="grid lg:grid-cols-2 gap-8">
+                    {/* بيانات العميل المحسنة بشكل كبير */}
+                    <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-8 rounded-2xl border-l-8 border-blue-500 shadow-2xl">
+                      <h4 className="font-black mb-8 text-3xl text-blue-800 flex items-center gap-4 bg-white p-4 rounded-xl shadow-lg">
+                        <span className="text-4xl">👤</span> 
+                        <span>بيانات العميل</span>
+                      </h4>
+                      <div className="space-y-6">
+                        <div className="bg-white p-6 rounded-xl shadow-lg border-2 border-blue-200 hover:shadow-xl transition-all duration-300">
+                          <div className="flex items-center gap-4 text-xl">
+                            <span className="text-3xl text-blue-600 bg-blue-100 p-3 rounded-full">📝</span>
+                            <div className="flex-1">
+                              <div className="text-lg text-gray-600 font-medium mb-2">اسم العميل</div>
+                              <div className="text-3xl font-black text-gray-800">{order.customer_name}</div>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="bg-white p-6 rounded-xl shadow-lg border-2 border-green-200 hover:shadow-xl transition-all duration-300">
+                          <div className="flex items-center gap-4 text-xl">
+                            <span className="text-3xl text-green-600 bg-green-100 p-3 rounded-full">📱</span>
+                            <div className="flex-1">
+                              <div className="text-lg text-gray-600 font-medium mb-2">رقم الهاتف</div>
+                              <a href={`tel:${order.customer_phone}`} 
+                                 className="text-3xl font-black text-green-600 hover:text-green-700 hover:underline block transition-all duration-200">
+                                {order.customer_phone}
+                              </a>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="bg-white p-6 rounded-xl shadow-lg border-2 border-red-200 hover:shadow-xl transition-all duration-300">
+                          <div className="flex items-start gap-4 text-xl">
+                            <span className="text-3xl text-red-600 bg-red-100 p-3 rounded-full">📍</span>
+                            <div className="flex-1">
+                              <div className="text-lg text-gray-600 font-medium mb-2">عنوان التوصيل</div>
+                              <div className="text-2xl font-bold text-gray-800 leading-relaxed">{order.customer_address}</div>
+                            </div>
+                          </div>
+                        </div>
+                        {order.notes && (
+                          <div className="bg-gradient-to-r from-yellow-100 to-orange-100 p-6 rounded-xl border-l-8 border-yellow-500 shadow-lg">
+                            <div className="flex items-start gap-4">
+                              <span className="text-3xl text-yellow-600 bg-yellow-200 p-3 rounded-full">💬</span>
+                              <div className="flex-1">
+                                <div className="text-lg text-gray-600 font-medium mb-2">ملاحظات خاصة من العميل</div>
+                                <div className="text-2xl font-bold text-yellow-800 bg-yellow-50 p-4 rounded-lg border border-yellow-300 shadow-inner">{order.notes}</div>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* تفاصيل الطلب المحسنة بشكل فائق */}
+                    <div className="bg-gradient-to-br from-green-50 to-green-100 p-8 rounded-2xl border-l-8 border-green-500 shadow-2xl">
+                      <h4 className="font-black mb-8 text-3xl text-green-800 flex items-center gap-4 bg-white p-4 rounded-xl shadow-lg">
+                        <span className="text-4xl">🍽️</span> 
+                        <span>تفاصيل الطلب</span>
+                      </h4>
+                      <div className="space-y-6">
+                        {order.items.map((item, index) => (
+                          <div key={index} className="bg-white p-6 rounded-xl shadow-lg border-2 border-green-200 hover:shadow-xl transition-all duration-300 hover:scale-105">
+                            <div className="flex justify-between items-center">
+                              <div className="flex items-center gap-4">
+                                <div className="bg-gradient-to-r from-green-500 to-green-600 text-white w-14 h-14 rounded-full flex items-center justify-center text-2xl font-black shadow-lg">
+                                  {item.quantity}
+                                </div>
+                                <div>
+                                  <div className="font-black text-2xl text-gray-800 mb-2">{item.name}</div>
+                                  <div className="text-gray-500 text-lg font-medium">{item.price} جنيه × {item.quantity} قطعة</div>
+                                </div>
+                              </div>
+                              <div className="text-right bg-green-50 p-4 rounded-xl border-2 border-green-200">
+                                <div className="font-black text-3xl text-green-600">{item.total || (item.quantity * parseInt(item.price))} ج</div>
+                                <div className="text-green-500 text-lg font-medium">المجموع الفرعي</div>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                        <div className="bg-gradient-to-r from-green-500 to-green-600 p-8 rounded-2xl shadow-2xl text-white border-4 border-green-300">
+                          <div className="flex justify-between items-center">
+                            <div className="flex items-center gap-4">
+                              <span className="text-4xl bg-white bg-opacity-20 p-3 rounded-full">💰</span>
+                              <span className="text-2xl font-black">الإجمالي النهائي للطلب:</span>
+                            </div>
+                            <div className="bg-white bg-opacity-20 p-4 rounded-xl">
+                              <span className="text-4xl font-black">{order.total_amount} جنيه</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* أزرار التحكم الفائقة */}
+                  <div className="mt-8 pt-6 border-t-4 border-gray-200">
+                    <h4 className="font-black mb-6 text-2xl text-gray-700 flex items-center gap-3 bg-gradient-to-r from-purple-100 to-pink-100 p-4 rounded-xl">
+                      <span className="text-3xl">⚡</span> 
+                      <span>إجراءات سريعة</span>
+                    </h4>
+                    <div className="flex gap-4 flex-wrap justify-center">
+                      {order.status === 'pending' && (
+                        <>
+                          <Button
+                            variant="primary"
+                            size="large"
+                            onClick={() => updateOrderStatus(order.id, 'confirmed')}
+                            className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-black px-8 py-4 rounded-xl shadow-2xl transform hover:scale-110 transition-all duration-300 text-xl"
+                          >
+                            <span className="text-2xl mr-3">✅</span>
+                            تأكيد الطلب فوراً
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="large"
+                            onClick={() => updateOrderStatus(order.id, 'cancelled')}
+                            className="bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white font-black px-8 py-4 rounded-xl shadow-2xl transform hover:scale-110 transition-all duration-300 text-xl"
+                          >
+                            <span className="text-2xl mr-3">❌</span>
+                            إلغاء الطلب
+                          </Button>
+                        </>
+                      )}
+                      
+                      {order.status === 'confirmed' && (
+                        <Button
+                          variant="primary"
+                          size="large"
+                          onClick={() => updateOrderStatus(order.id, 'preparing')}
+                          className="bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-black px-8 py-4 rounded-xl shadow-2xl transform hover:scale-110 transition-all duration-300 text-xl"
+                        >
+                          <span className="text-2xl mr-3">🍳</span>
+                          بدء التحضير الآن
+                        </Button>
+                      )}
+                      
+                      {order.status === 'preparing' && (
+                        <Button
+                          variant="primary"
+                          size="large"
+                          onClick={() => updateOrderStatus(order.id, 'ready')}
+                          className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-black px-8 py-4 rounded-xl shadow-2xl transform hover:scale-110 transition-all duration-300 text-xl"
+                        >
+                          <span className="text-2xl mr-3">🎯</span>
+                          جاهز للتوصيل
+                        </Button>
+                      )}
+                      
+                      {order.status === 'ready' && (
+                        <Button
+                          variant="primary"
+                          size="large"
+                          onClick={() => updateOrderStatus(order.id, 'delivered')}
+                          className="bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white font-black px-8 py-4 rounded-xl shadow-2xl transform hover:scale-110 transition-all duration-300 text-xl"
+                        >
+                          <span className="text-2xl mr-3">🚚</span>
+                          تم التوصيل بنجاح
+                        </Button>
+                      )}
+                      
+                      {(order.status === 'delivered' || order.status === 'cancelled') && (
+                        <div className="bg-gradient-to-r from-gray-200 to-gray-300 px-6 py-4 rounded-xl text-gray-700 font-black text-xl shadow-lg">
+                          <span className="text-2xl mr-3">{getStatusConfig(order.status).icon}</span>
+                          تم الانتهاء من الطلب
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </Card.Content>
+              </Card>
+              )
+            })
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
